@@ -101,6 +101,7 @@ class ::SItemWithCoding < Sequel::Model(SDB[:items]); end
 class ::SItemWithEncoding < Sequel::Model(SDB[:items]); end
 class ::SItemWithWarnIndent < Sequel::Model(SDB[:items]); end
 class ::SItemWithWarnPastScope < Sequel::Model(SDB[:items]); end
+class ::SItemWithMagicComment < Sequel::Model(SDB[:items]); end
 class ::SCategory < Sequel::Model(SDB[:categories]); end
 class ::SManufacturer < Sequel::Model(SDB[:manufacturers]); end
 class ::NewlineTest < Sequel::Model; end
@@ -131,6 +132,12 @@ describe Sequel::Annotate do
   end
   after do
     Dir['spec/tmp/*.rb'].each{|f| File.delete(f)}
+  end
+
+  it "skips files with the sequel-annotate magic comment set to false" do
+    FileUtils.cp('spec/unannotated/sitemwithmagiccomment.rb', 'spec/tmp/')
+    Sequel::Annotate.annotate(['spec/tmp/sitemwithmagiccomment.rb'])
+    File.read('spec/tmp/sitemwithmagiccomment.rb').must_equal File.read('spec/unannotated/sitemwithmagiccomment.rb')
   end
 
   it "#schema_info should not return sections we set to false" do

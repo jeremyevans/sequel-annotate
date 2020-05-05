@@ -13,6 +13,8 @@ module Sequel
       namespace = options[:namespace]
 
       paths.each do |path|
+        next if File.read(path).match(/^#\s+sequel-annotate:\s+false$/i)
+
         if match = File.read(path).match(/class (\S+)\s*</)
           name = match[1]
           if namespace
