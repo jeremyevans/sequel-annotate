@@ -6,7 +6,7 @@ module Sequel
     # Attempts to guess the model for each file using a regexp match of
     # the file's content, if this doesn't work, you'll need to create
     # an instance manually and pass in the model and path. Example:
-    # 
+    #
     #   Sequel::Annotate.annotate(Dir['models/*.rb'])
     def self.annotate(paths, options = {})
       Sequel.extension :inflector
@@ -53,7 +53,7 @@ module Sequel
       orig = current = File.read(path).rstrip
 
       if options[:position] == :before
-        if current =~ /\A((?:^\s*$|^#\s*(?:frozen_string_literal|coding|encoding|warn_indent|warn_past_scope)[^\n]*\s*)*)/m
+        if current =~ /\A((?:^\s*$|^#\s*(?:frozen_string_literal|coding|encoding|warn_indent|warn_past_scope|rubocop)[^\n]*\s*)*)/m
           magic_comments = $1
           current.slice!(0, magic_comments.length)
         end
@@ -80,7 +80,7 @@ module Sequel
       end
     end
 
-    # The schema comment to use for this model.  
+    # The schema comment to use for this model.
     # For all databases, includes columns, indexes, and foreign
     # key constraints in this table referencing other tables.
     # On PostgreSQL, also includes check constraints, triggers,
