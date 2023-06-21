@@ -98,6 +98,11 @@ as annotations don't really make sense for them since they are not backed by a
 table.  You can skip other models by using a <tt># sequel-annotate: false</tt>
 magic comment somewhere in the file.
 
+=== Associations
+
+If you add the magic comment <tt># sequel-annotate: false</tt> somewhere in your model,
+it will be replaced with accessors generated from all columns and associations.
+
 === Rake Task
 
 Here's an example rake task for sequel-annotate:

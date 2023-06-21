@@ -6,7 +6,7 @@ module Sequel
     # Attempts to guess the model for each file using a regexp match of
     # the file's content, if this doesn't work, you'll need to create
     # an instance manually and pass in the model and path. Example:
-    # 
+    #
     #   Sequel::Annotate.annotate(Dir['models/*.rb'])
     def self.annotate(paths, options = {})
       Sequel.extension :inflector
@@ -52,6 +52,8 @@ module Sequel
 
       orig = current = File.read(path).rstrip
 
+      add_accessors = orig.match(/^\s*#\s+sequel-annotate:\s+accessors$/i)
+
       if options[:position] == :before
         if (current =~ /\A((?:^\s*$|^#\s*(?:frozen_string_literal|coding|encoding|warn_indent|warn_past_scope)[^\n]*\s*)*)/m) && !$1.empty?
           magic_comments = $1
@@ -73,6 +75,10 @@ module Sequel
         current += "#{$/}#{$/}#{schema_comment(options)}"
       end
 
+      if add_accessors
+        current = replace_accessors(current)
+      end
+
       if orig != current
         File.open(path, "wb") do |f|
           f.puts current
@@ -80,7 +86,7 @@ module Sequel
       end
     end
 
-    # The schema comment to use for this model.  
+    # The schema comment to use for this model.
     # For all databases, includes columns, indexes, and foreign
     # key constraints in this table referencing other tables.
     # On PostgreSQL, also includes check constraints, triggers,
@@ -305,6 +311,102 @@ SQL
         output.concat(align(rows).sort)
       end
     end
+
+    def replace_accessors(contents)
+      # undocumented_columns.delete_if { |col| contents.match(/^#\s+@!attribute\s+#{col}$/) }
+      start_of_accessors = contents.match(/^(\s*#\s+sequel-annotate:\s+accessors$)/i)
+      end_of_accessors = contents.match(/^(\s*#\s+sequel-annotate:\s+endaccessors$)/i) || start_of_accessors
+      content_start = contents[..start_of_accessors.begin(0)].rstrip
+      content_end = contents[end_of_accessors.end(0)..].lstrip
+      start_comment = start_of_accessors[0]
+      end_comment = end_of_accessors[0]
+      if start_comment == end_comment
+        end_comment = end_comment.gsub("accessors", "endaccessors")
+      end
+
+      accessors = []
+
+      model.columns.each do |col|
+        sch = model.db_schema[col]
+        dbtype = sch[:db_domain_type] || sch[:db_type]
+        rubytype = DB_TO_RUBY_TYPES.find do |(s, rt)|
+          break rt if s == dbtype
+          break rt if s.is_a?(Regexp) && s =~ dbtype
+        end
+        if rubytype
+          accessors << {name: col, type: rubytype}
+        end
+      end
+
+      model.association_reflections.each do |name, r|
+        rcls = r[:model]
+        if r[:type].to_s.end_with?('_many')
+          rcls = "Array<#{rcls}>"
+        end
+        accessors << {name: name, type: rcls}
+      end
+
+      accessors.sort_by! { |h| h[:name] }
+
+      prefix_index = /\S/ =~ start_comment
+      space_prefix = start_comment[...prefix_index || 0]
+      accessor_strs = accessors.map do |h|
+        "#{space_prefix}# @!attribute #{h[:name]}\n#{space_prefix}# @return [#{h[:type]}]\n"
+      end
+
+      allparts = [content_start, start_comment + "\n"] + accessor_strs + [end_comment, content_end]
+      allparts.join("\n")
+    end
+
+    DB_TO_RUBY_TYPES = [
+      ### Postgres types
+      ['bigint', Integer],
+      ['bigserial', Integer],
+      # ['bit [ (n) ]', ],
+      # ['bit varying [ (n) ]', ],
+      ['boolean', "TrueClass,FalseClass"],
+      # ['box', ],
+      # ['bytea', ],
+      [/^character /, String],
+      # ['character varying [ (n) ]', ],
+      ['cidr', String],
+      # ['circle', ],
+      ['date', Date],
+      ['double precision', Float],
+      ['inet', String],
+      ['integer', Integer],
+      # ['interval [ fields ] [ (p) ]', ],
+      ['json', Object],
+      ['jsonb', Object],
+      # ['line', ],
+      # ['lseg', ],
+      ['macaddr', String],
+      ['macaddr8', String],
+      # ['money', ],
+      [/^numeric/, BigDecimal],
+      # ['path', ],
+      # ['pg_lsn', ],
+      # ['pg_snapshot', ],
+      # ['point', ],
+      # ['polygon', ],
+      ['real', Float],
+      ['smallint', Integer],
+      ['smallserial', Integer],
+      ['serial', Integer],
+      ['text', String],
+      [/^time\s?/, Time],
+      # ['time [ (p) ] with time zone', ],
+      [/timestamp\s?/, Time],
+      # ['timestamp [ (p) ] with time zone', ],
+      # ['tsquery', ],
+      # ['tsvector', ],
+      # ['txid_snapshot', ],
+      ['uuid', String],
+      # ['xml', ],
+
+      ### Sqlite Types
+      ['blob', Object,]
+    ]
 
     # Whether we should skip annotations for the model.
     # True if the model selects from a dataset.

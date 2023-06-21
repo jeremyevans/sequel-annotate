@@ -133,6 +133,13 @@ class SComplexDataset < Sequel::Model(SDB[:items].left_join(:categories, :id => 
 class SErrorDataset < Sequel::Model(:items)
   def self.dataset; raise Sequel::Error; end
 end
+class ::AccessorItm < Sequel::Model(DB[:items])
+  one_to_many :o2m_tcls, class: AccessorItm
+  one_to_many :o2m_scls, class: 'AccessorItm'
+  many_to_one :m2o, class: AccessorItm
+  many_to_one :accessor_itm
+  many_to_many :m2mothers, class: AccessorItm
+end
 
 # Abstract Base Class
 ABC = Class.new(Sequel::Model)
@@ -403,7 +410,7 @@ OUTPUT
 #  (c) REFERENCES fk_tests(b)
 OUTPUT
   end
-  
+
   it "#annotate should append the schema comment if current schema comment is not at the end of the file" do
     FileUtils.cp('spec/unannotated/sitemwithcoding.rb', 'spec/tmp')
     Sequel::Annotate.new(SItemWithCoding).annotate("spec/tmp/sitemwithcoding.rb", :position=>:before)
@@ -460,5 +467,12 @@ OUTPUT
     FileUtils.cp('spec/namespaced/itm_unannotated.rb', 'spec/tmp')
     Sequel::Annotate.annotate(["spec/tmp/itm_unannotated.rb"], :namespace=>true)
     File.read("spec/tmp/itm_unannotated.rb").must_equal fix_pg_comment(File.read('spec/namespaced/itm_annotated.rb'))
+  end
+
+  it ".annotate #{desc} adds inline YARD docs if `sequel-annotate: accessors` is present" do
+    FileUtils.cp('spec/accessors/itm_unannotated.rb', 'spec/tmp/')
+    Sequel::Annotate.annotate(["spec/tmp/itm_unannotated.rb"])
+    puts File.read("spec/tmp/itm_unannotated.rb")
+    File.read("spec/tmp/itm_unannotated.rb").must_equal fix_pg_comment(File.read('spec/accessors/itm_annotated.rb'))
   end
 end
